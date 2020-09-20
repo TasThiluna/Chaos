@@ -20,6 +20,7 @@ public class chaos : MonoBehaviour
     public Color[] colors;
     public Color black;
     public Color orange;
+    public Color beige;
     public Font shapeFont;
     public Font letterFont;
     public Font[] boozleFonts;
@@ -48,11 +49,12 @@ public class chaos : MonoBehaviour
     private int moduleId;
     private bool moduleSolved;
     private bool activated;
+    private bool cantPress;
 
     void Awake()
     {
         moduleId = moduleIdCounter++;
-        module.OnActivate += delegate () { activated = true; };
+        module.OnActivate += delegate () { activated = true; audio.PlaySoundAtTransform("activate", transform); };
         foreach (KMSelectable tile in tiles)
             tile.OnInteract += delegate () { PressTile(tile); return false; };
     }
@@ -62,7 +64,7 @@ public class chaos : MonoBehaviour
         var startingSquare = rnd.Range(0, 25);
         for (int i = 0; i < 25; i++)
         {
-            complexityLevels[i] = i == startingSquare ? new List<CL> { CL.pattern, CL.boozleglyph, CL.morse } : new List<CL> { CL.inactive };
+            complexityLevels[i] = i == startingSquare ? new List<CL> { CL.primary } : new List<CL> { CL.inactive };
             tileTexts[i].text = "";
         }
         GenerateStage();
@@ -71,16 +73,37 @@ public class chaos : MonoBehaviour
     void PressTile(KMSelectable tile)
     {
         tile.AddInteractionPunch(.5f);
-        if (moduleSolved || !activated)
+        if (moduleSolved || !activated || cantPress)
             return;
         var ix = Array.IndexOf(tiles, tile);
         if (ix == solution[enteringStage])
         {
             Debug.LogFormat("[Chaos #{0}] You pressed {1}. That was correct.", moduleId, Coordinate(ix));
+            BlankButton(ix);
+            if (!(complexityLevels[ix].Contains(CL.pattern) && complexityLevels[ix].Contains(CL.boozleglyph) && complexityLevels[ix].Contains(CL.morse)))
+                incrementNextStage[ix] = true;
+            audio.PlaySoundAtTransform("press", tile.transform);
+            enteringStage++;
+
+            if (enteringStage == solution.Count())
+            {
+                if (!lastStage)
+                {
+                    for (int i = 0; i < 25; i++)
+                        BlankButton(i);
+                    stage++;
+                    StartCoroutine(WaitForNewStage());
+                }
+                else
+                {
+                    // To-do: Solve + animation
+                }
+            }
         }
         else
         {
             Debug.LogFormat("[Chaos #{0}] You pressed {1}. That was incorrect. Strike!", moduleId, Coordinate(ix));
+            audio.PlaySoundAtTransform("strike", tile.transform);
             module.HandleStrike();
         }
     }
@@ -90,11 +113,12 @@ public class chaos : MonoBehaviour
         // To-do: Check if this stage is the last
 
         // Iincrement levels of complexity
+        Debug.Log(incrementNextStage.Join());
         for (int i = 0; i < 25; i++)
         {
             if (incrementNextStage[i])
             {
-                var level = complexityLevels[i].ToList();
+                var level = complexityLevels[i];
                 if (level.Contains(CL.inactive))
                 {
                     level.Remove(CL.inactive);
@@ -108,34 +132,41 @@ public class chaos : MonoBehaviour
                         possibleIncrements.Add(CL.secondary);
                         possibleIncrements.Add(CL.shape);
                     }
-                    if (level.Contains(CL.secondary))
+                    else if (level.Contains(CL.secondary))
+                    {
+                        possibleIncrements.Add(CL.shape);
                         possibleIncrements.Add(CL.pattern);
+                    }
                     if (level.Contains(CL.shape))
                     {
                         possibleIncrements.Add(CL.letter);
                         possibleIncrements.Add(CL.morse);
                     }
-                    if (level.Contains(CL.letter))
+                    else if (level.Contains(CL.letter))
+                    {
                         possibleIncrements.Add(CL.boozleglyph);
-                    complexityLevels[i].Add(possibleIncrements.PickRandom());
+                        possibleIncrements.Add(CL.morse);
+                    }
+                    level.Add(possibleIncrements.Where(x => !level.Contains(x)).PickRandom());
                 }
 
-                level = complexityLevels[i].ToList();
+                level = complexityLevels[i];
                 if (level.Contains(CL.secondary))
-                    complexityLevels[i].Remove(CL.primary);
+                    level.Remove(CL.primary);
                 if (level.Contains(CL.pattern))
-                    complexityLevels[i].Remove(CL.secondary);
+                    level.Remove(CL.secondary);
                 if (level.Contains(CL.letter))
-                    complexityLevels[i].Remove(CL.shape);
+                    level.Remove(CL.shape);
                 if (level.Contains(CL.boozleglyph))
-                    complexityLevels[i].Remove(CL.letter);
+                    level.Remove(CL.letter);
             }
+
+            incrementNextStage[i] = false;
+            values[i] = 0;
         }
 
+        enteringStage = 0;
         Debug.LogFormat("[Chaos {0}] STAGE {1}:", moduleId, stage + 1);
-        /*var top = stage % 2 == 0;
-        if (complexityLevels.Any(x => x.Contains(CL.primary) || x.Contains(CL.secondary)))
-            Debug.LogFormat("[Chaos #{0}] Use the {1} row for color calculatons.", moduleId, top ? "top" : "bottom");*/
 
         // Calculate A values before % 15
         tryAgain:
@@ -143,10 +174,11 @@ public class chaos : MonoBehaviour
         var solutionBools = new bool[25];
         var boozleCoroutines = new List<BoozleCoroutineInfo>();
         var morseCoroutines = new List<MorseCoroutineInfo>();
-        //var complexityNames = new string[] { "primary color", "secondary color", "pattern", "simple shape", "letter", "boozleglyph", "Morse code" };
         for (int i = 0; i < 25; i++)
         {
             var A = 0;
+            if (complexityLevels[i].Contains(CL.inactive))
+                tileRenders[i].material.SetColor("_ColorA", beige);
             if (complexityLevels[i].Contains(CL.primary))
             {
                 var color = rnd.Range(0, 3);
@@ -242,13 +274,13 @@ public class chaos : MonoBehaviour
         // Sort the tiles in the solution
         if (!solutionBools.Any(x => x))
             goto tryAgain;
-        else
-            solution = solutionBools.Select((b, i) => new { index = i, value = b }).Where(o => o.value).Select(o => o.index).OrderBy(x => values[x]).ThenBy(x => x).ToList();
+        solution = solutionBools.Select((b, i) => new { index = i, value = b }).Where(o => o.value).Select(o => o.index).OrderBy(x => values[x]).ThenBy(x => x).ToList();
         Debug.LogFormat("[Chaos #{0}] SOLUTION: {1}", moduleId, solution.Select(x => Coordinate(x)).Join(", "));
         foreach (BoozleCoroutineInfo c in boozleCoroutines) // This is done with boozleglyph and Morse coroutines to prevent overlapping coroutines in the case of the module needing to try again
             boozleglyphCoroutines[c.index] = StartCoroutine(BoozleCycle(c));
         foreach (MorseCoroutineInfo c in morseCoroutines)
             morseCodeCoroutines[c.index] = StartCoroutine(FlashMorse(c));
+        cantPress = false;
     }
 
     IEnumerator BoozleCycle(BoozleCoroutineInfo c)
@@ -279,6 +311,31 @@ public class chaos : MonoBehaviour
         }
         yield return new WaitForSeconds(1f);
         goto resetCycle;
+    }
+
+    void BlankButton(int ix)
+    {
+        if (boozleglyphCoroutines[ix] != null)
+        {
+            StopCoroutine(boozleglyphCoroutines[ix]);
+            boozleglyphCoroutines[ix] = null;
+        }
+        if (morseCodeCoroutines[ix] != null)
+        {
+            StopCoroutine(morseCodeCoroutines[ix]);
+            morseCodeCoroutines[ix] = null;
+        }
+        tileRenders[ix].material.SetColor("_ColorA", black);
+        tileRenders[ix].material.SetColor("_ColorB", black);
+        tileTexts[ix].text = "";
+    }
+
+    IEnumerator WaitForNewStage()
+    {
+        cantPress = true;
+        yield return new WaitForSeconds(4f);
+        audio.PlaySoundAtTransform("stage", transform);
+        GenerateStage();
     }
 
     string Coordinate(int x)

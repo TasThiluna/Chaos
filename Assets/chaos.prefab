@@ -6214,6 +6214,7 @@ MonoBehaviour:
   - {r: 0.972549, g: 0.972549, b: 0.972549, a: 1}
   black: {r: 0.22794116, g: 0.21620889, b: 0.21620889, a: 1}
   orange: {r: 1, g: 0.79310346, b: 0.25, a: 1}
+  beige: {r: 0.75686276, g: 0.75686276, b: 0.5294118, a: 1}
   shapeFont: {fileID: 12800000, guid: 20a58b7197370d143aceaf99ca87ee76, type: 3}
   letterFont: {fileID: 12800000, guid: b7ba41a68efb9f849be93207106cdaae, type: 3}
   boozleFonts:
