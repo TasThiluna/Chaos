@@ -1,0 +1,23 @@
+fileFormatVersion: 2
+guid: cd596015c1bf7b446b76886a5eb215f7
+TrueTypeFontImporter:
+  externalObjects: {}
+  serializedVersion: 4
+  fontSize: 16
+  forceTextureCase: -2
+  characterSpacing: 0
+  characterPadding: 1
+  includeFontData: 1
+  fontName: SVGFont
+  fontNames:
+  - SVGFont
+  fallbackFontReferences:
+  - {fileID: 12800000, guid: 789ce3e3ea3eafb42a284f0c065c8d33, type: 3}
+  - {fileID: 12800000, guid: 05f28a1caf820f14ab217ad6d8651ef6, type: 3}
+  customCharacters: 
+  fontRenderingMode: 0
+  ascentCalculationMode: 1
+  useLegacyBoundsCalculation: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
